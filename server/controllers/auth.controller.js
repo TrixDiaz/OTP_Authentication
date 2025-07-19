@@ -500,39 +500,50 @@ export const validateToken = async (req, res, next) => {
       },
     });
   } catch (error) {
-    next(error);
+    // Return consistent error format for invalid tokens
+    res.status(401).json({
+      success: false,
+      valid: false,
+      message: "Invalid or expired token",
+      error: error.message,
+    });
   }
 };
 
+// Improved token authentication middleware with better error handling
 export const authenticateToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(" ")[1]; // Bearer TOKEN
 
   if (!token) {
-    const error = new Error("Access token is required");
-    error.statusCode = 401;
-    return next(error);
+    return res.status(401).json({
+      success: false,
+      valid: false,
+      message: "Access token is required",
+      code: "NO_TOKEN"
+    });
   }
 
   jwt.verify(token, JWT_SECRET, async (err, decoded) => {
     if (err) {
-      let error;
+      let errorResponse = {
+        success: false,
+        valid: false,
+        message: "Token verification failed"
+      };
 
       if (err.name === "TokenExpiredError") {
-        error = new Error("Token has expired");
-        error.statusCode = 401;
-        error.code = "TOKEN_EXPIRED";
+        errorResponse.message = "Token has expired";
+        errorResponse.code = "TOKEN_EXPIRED";
       } else if (err.name === "JsonWebTokenError") {
-        error = new Error("Invalid token");
-        error.statusCode = 401;
-        error.code = "INVALID_TOKEN";
+        errorResponse.message = "Invalid token";
+        errorResponse.code = "INVALID_TOKEN";
       } else {
-        error = new Error("Token verification failed");
-        error.statusCode = 401;
-        error.code = "TOKEN_VERIFICATION_FAILED";
+        errorResponse.message = "Token verification failed";
+        errorResponse.code = "TOKEN_VERIFICATION_FAILED";
       }
 
-      return next(error);
+      return res.status(401).json(errorResponse);
     }
 
     // Add decoded user info to request

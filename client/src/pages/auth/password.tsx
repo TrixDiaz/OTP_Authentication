@@ -3,18 +3,17 @@ import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import AuthCard from '@/components/authCard';
 import { useAuthStore } from '@/lib/authStore';
-import { cookieUtils } from '@/lib/cookies';
 
 export default function Password() {
     const [ isLoading, setIsLoading ] = useState(false);
     const [ message, setMessage ] = useState<string>('');
     const navigate = useNavigate();
-    const email = useAuthStore((state) => state.email);
+    const { email, setEmail, clearFlowType, setTokens } = useAuthStore();
 
     // Redirect if no email is available
     useEffect(() => {
         if (!email) {
-            navigate('/login');
+            navigate('/login', { replace: true });
         }
     }, [ email, navigate ]);
 
@@ -35,51 +34,95 @@ export default function Password() {
         setMessage('');
 
         try {
-            // Add your password verification logic here
-            // const response = await axios.post('http://localhost:3000/api/v1/auth/verify-password', {
+            // TODO: Implement password verification API call when server endpoint is ready
+            // const response = await httpClient.post('/v1/auth/verify-password', {
             //     email: email,
             //     password: password
-            // });
+            // }, false);
 
-            setMessage('Password verified successfully!');
-            toast.success('Password verified successfully!');
+            // Mock successful response for now
+            const mockResponse = {
+                success: true,
+                message: 'Password verification successful',
+                accessToken: 'mock-access-token-password-' + Date.now(),
+                refreshToken: 'mock-refresh-token-password-' + Date.now(),
+                user: {
+                    id: 'mock-user-id',
+                    email: email,
+                    name: email.split('@')[ 0 ],
+                    isVerified: true,
+                    profileCompleted: false,
+                    hasCompletedProfile: false,
+                    createdAt: new Date().toISOString()
+                }
+            };
 
-            // Store tokens in cookies if available
-            // if (response.data.accessToken) {
-            //     cookieUtils.setTokens(response.data.accessToken, response.data.refreshToken);
-            // }
+            // Simulate API delay
+            await new Promise(resolve => setTimeout(resolve, 1000));
 
-            // Navigate to dashboard or main app
-            // navigate('/dashboard');
+            if (mockResponse.success) {
+                setMessage('Password verification successful!');
+                toast.success('Password verification successful!');
+
+                // Store tokens and user data using the enhanced auth store
+                if (mockResponse.accessToken && mockResponse.refreshToken) {
+                    setTokens(mockResponse.accessToken, mockResponse.refreshToken, mockResponse.user);
+
+                    // Small delay to ensure state is updated properly
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+
+                // Clean up auth flow data
+                setEmail('');
+                clearFlowType();
+
+                // Navigate to dashboard
+                setTimeout(() => {
+                    navigate('/dashboard', { replace: true });
+                }, 1000);
+            } else {
+                const errorMessage = mockResponse.message || 'Invalid password. Please try again.';
+                setMessage(errorMessage);
+                toast.error(errorMessage);
+            }
         } catch (error: any) {
-            const errorMessage = 'Invalid password. Please try again.';
+            console.error('Password verification error:', error);
+
+            let errorMessage = 'An unexpected error occurred. Please try again.';
+
+            if (error.response?.data?.message) {
+                errorMessage = error.response.data.message;
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+
             setMessage(errorMessage);
             toast.error(errorMessage);
         } finally {
             setIsLoading(false);
         }
-    }, [ email, navigate ]);
+    }, [ email, navigate, setEmail, clearFlowType, setTokens ]);
 
     if (!email) {
-        return null; // Will redirect to login
+        return null; // Will redirect
     }
 
     return (
         <AuthCard
-            title='Password'
-            description='Enter your password to login'
-            inputLabel='Password'
-            inputType='password'
-            inputPlaceholder='Password'
+            title="Enter your Password"
+            description="Use your account password to sign in"
+            inputLabel="Password"
+            inputType="password"
+            inputPlaceholder="Enter your password"
             backIcon={true}
             backIconTo="/other-ways"
             tooltip={true}
-            tooltipText="Back to Other Ways to login"
-            buttonText={isLoading ? 'Logging in...' : 'Login'}
-            buttonVariant='default'
-            linkText='Forgot password?'
-            linkAction='Reset'
-            linkTo='/forgot-password'
+            tooltipText="Back to Other Ways"
+            buttonText={isLoading ? 'Verifying...' : 'Sign In'}
+            buttonVariant="default"
+            linkText="Forgot your password?"
+            linkAction="Reset Password"
+            linkTo="/forgot-password"
             showEmailBadge={true}
             onSubmit={handlePasswordSubmit}
             isLoading={isLoading}

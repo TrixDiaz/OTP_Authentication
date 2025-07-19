@@ -5,71 +5,59 @@ import { Logo } from '@/components/logo';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { cookieUtils } from '@/lib/cookies';
 import { useAuthStore } from '@/lib/authStore';
 import { LogOut, User, Mail, Calendar, Shield } from 'lucide-react';
 
-interface UserInfo {
-    email?: string;
-    name?: string;
-    joinDate?: string;
-    isVerified?: boolean;
-}
-
 export default function Home() {
-    const [ userInfo, setUserInfo ] = useState<UserInfo>({});
+    const [ isLoading, setIsLoading ] = useState(true);
     const navigate = useNavigate();
-    const { email: authEmail, clearEmail } = useAuthStore();
+    const { user, email: authEmail, clearEmail, logout } = useAuthStore();
 
     useEffect(() => {
-        // Check if user is authenticated
-        const { accessToken } = cookieUtils.getTokens();
+        // Set loading to false after component mounts since authentication is guaranteed by ProtectedRoute
+        setIsLoading(false);
 
-        if (!accessToken) {
-            toast.error('Please login to access this page');
-            navigate('/login');
-            return;
-        }
-
-        // Use actual email from auth store if available, otherwise use mock data
-        const userEmail = authEmail || 'user@example.com';
-        
-        // Extract name from email (simple approach)
-        const extractNameFromEmail = (email: string) => {
-            const localPart = email.split('@')[0];
-            return localPart.split('.').map(part => 
-                part.charAt(0).toUpperCase() + part.slice(1)
-            ).join(' ');
-        };
-
-        setUserInfo({
-            email: userEmail,
-            name: extractNameFromEmail(userEmail),
-            joinDate: new Date().toLocaleDateString(),
-            isVerified: true
-        });
-
-        // Clear email from auth store since we've captured it
+        // Clear email from auth store since we've reached the authenticated area
         if (authEmail) {
             clearEmail();
         }
 
         toast.success('Welcome to your dashboard!');
-    }, [ navigate, authEmail, clearEmail ]);
+    }, [ authEmail, clearEmail ]);
 
-    const handleLogout = () => {
-        cookieUtils.clearTokens();
-        toast.success('Logged out successfully');
-        navigate('/login');
+    const handleLogout = async () => {
+        try {
+            await logout();
+            toast.success('Logged out successfully');
+            navigate('/login', { replace: true });
+        } catch (error) {
+            console.error('Logout error:', error);
+            toast.error('Logout failed, but you will be redirected');
+            navigate('/login', { replace: true });
+        }
     };
 
-    if (!userInfo.email) {
+    if (isLoading) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
             </div>
         );
     }
+
+    // Use user data from the store, with fallback for display
+    const displayUser = user || {
+        email: 'user@example.com',
+        name: 'User',
+        isVerified: true,
+        createdAt: new Date().toISOString()
+    };
+
+    // Extract name from email if no name is provided
+    const displayName = displayUser.name || displayUser.email.split('@')[ 0 ]
+        .split('.').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+
+    const joinDate = new Date(displayUser.createdAt).toLocaleDateString();
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -97,7 +85,7 @@ export default function Home() {
             <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
                 <div className="mb-8">
                     <h2 className="text-3xl font-bold text-gray-900 mb-2">
-                        Welcome back, {userInfo.name}!
+                        Welcome back, {displayName}!
                     </h2>
                     <p className="text-gray-600">
                         Here's your account information and dashboard overview.
@@ -123,8 +111,8 @@ export default function Home() {
                                     <span className="text-sm font-medium text-gray-900">Email</span>
                                 </div>
                                 <div className="flex items-center space-x-2">
-                                    <span className="text-sm text-gray-600">{userInfo.email}</span>
-                                    {userInfo.isVerified && (
+                                    <span className="text-sm text-gray-600">{displayUser.email}</span>
+                                    {displayUser.isVerified && (
                                         <Badge variant="default" className="bg-green-100 text-green-800">
                                             <Shield className="w-3 h-3 mr-1" />
                                             Verified
@@ -138,7 +126,7 @@ export default function Home() {
                                     <User className="w-4 h-4 text-gray-500" />
                                     <span className="text-sm font-medium text-gray-900">Full Name</span>
                                 </div>
-                                <span className="text-sm text-gray-600">{userInfo.name}</span>
+                                <span className="text-sm text-gray-600">{displayName}</span>
                             </div>
 
                             <div className="flex items-center justify-between">
@@ -146,7 +134,7 @@ export default function Home() {
                                     <Calendar className="w-4 h-4 text-gray-500" />
                                     <span className="text-sm font-medium text-gray-900">Member Since</span>
                                 </div>
-                                <span className="text-sm text-gray-600">{userInfo.joinDate}</span>
+                                <span className="text-sm text-gray-600">{joinDate}</span>
                             </div>
                         </CardContent>
                     </Card>

@@ -1,16 +1,15 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
-import axios from 'axios';
 import AuthCard from '@/components/authCard';
 import { useAuthStore } from '@/lib/authStore';
-import { cookieUtils } from '@/lib/cookies';
+import { httpClient } from '@/lib/httpClient';
 
 export default function Otp() {
     const [ isLoading, setIsLoading ] = useState(false);
     const [ message, setMessage ] = useState<string>('');
     const navigate = useNavigate();
-    const { email, flowType, clearAll, clearFlowType } = useAuthStore();
+    const { email, flowType, setEmail, clearFlowType, setTokens } = useAuthStore();
 
     // Redirect if no email or flow type is available
     useEffect(() => {
@@ -37,16 +36,16 @@ export default function Otp() {
 
         try {
             const endpoint = flowType === 'register'
-                ? 'http://localhost:3000/api/v1/auth/verify-registration-otp'
-                : 'http://localhost:3000/api/v1/auth/verify-login-otp';
+                ? '/v1/auth/verify-registration-otp'
+                : '/v1/auth/verify-login-otp';
 
-            const response = await axios.post(endpoint, {
+            const response = await httpClient.post(endpoint, {
                 email: email,
                 otp: otp
-            });
+            }, false); // Don't require auth for this request
 
             // Handle successful response
-            if (response.status === 200 || response.status === 201) {
+            if (response.success) {
                 const successMessage = flowType === 'register'
                     ? 'Registration successful!'
                     : 'Login successful!';
@@ -54,64 +53,68 @@ export default function Otp() {
                 setMessage(successMessage);
                 toast.success(successMessage);
 
-                // Store tokens in cookies if available
-                if (response.data.accessToken) {
-                    cookieUtils.setTokens(response.data.accessToken, response.data.refreshToken);
+                // Store tokens and user data using the enhanced auth store
+                if (response.accessToken && response.refreshToken) {
+                    // The new setTokens method accepts user data as third parameter
+                    setTokens(response.accessToken, response.refreshToken, response.user);
+
+                    // Small delay to ensure state is updated properly
+                    await new Promise(resolve => setTimeout(resolve, 100));
                 }
 
-                // For registration, clear auth store immediately
-                // For login, keep email in store briefly for home page, then clear
-                if (flowType === 'register') {
-                    clearAll();
-                } else {
-                    // Clear flow type but keep email for home page
-                    clearFlowType();
-                }
+                // Clean up auth flow data - user is now authenticated
+                setEmail('');
+                clearFlowType();
 
-                // Redirect based on flow type
+                // Navigate to dashboard after successful verification
                 setTimeout(() => {
-                    if (flowType === 'register') {
-                        navigate('/login'); // Redirect to login after successful registration
-                    } else {
-                        navigate('/dashboard'); // Redirect to dashboard after successful login
-                    }
-                }, 1500);
+                    navigate('/dashboard', { replace: true });
+                }, 1000);
+            } else {
+                const errorMessage = response.message || 'Invalid OTP. Please try again.';
+                setMessage(errorMessage);
+                toast.error(errorMessage);
             }
         } catch (error: any) {
             // Handle error response
-            if (error.response) {
-                const errorMessage = error.response.data.message || 'Invalid OTP. Please try again.';
-                setMessage(errorMessage);
-                toast.error(errorMessage);
-            } else if (error.request) {
-                const errorMessage = 'Network error. Please check your connection.';
-                setMessage(errorMessage);
-                toast.error(errorMessage);
-            } else {
-                const errorMessage = 'An unexpected error occurred. Please try again.';
-                setMessage(errorMessage);
-                toast.error(errorMessage);
+            console.error('OTP verification error:', error);
+
+            let errorMessage = 'An unexpected error occurred. Please try again.';
+
+            if (error.response?.data?.message) {
+                errorMessage = error.response.data.message;
+            } else if (error.message) {
+                errorMessage = error.message;
             }
+
+            setMessage(errorMessage);
+            toast.error(errorMessage);
         } finally {
             setIsLoading(false);
         }
-    }, [ email, flowType, navigate, clearAll ]);
+    }, [ email, flowType, navigate, setEmail, clearFlowType, setTokens ]);
 
     const handleResendOtp = useCallback(async () => {
         if (!email || !flowType) return;
 
         try {
             const endpoint = flowType === 'register'
-                ? 'http://localhost:3000/api/v1/auth/send-registration-otp'
-                : 'http://localhost:3000/api/v1/auth/send-login-otp';
+                ? '/v1/auth/send-registration-otp'
+                : '/v1/auth/send-login-otp';
 
-            await axios.post(endpoint, {
+            const response = await httpClient.post(endpoint, {
                 email: email
-            });
-            setMessage('OTP resent successfully!');
-            toast.success('OTP resent successfully!');
-        } catch (error) {
-            const errorMessage = 'Failed to resend OTP. Please try again.';
+            }, false); // Don't require auth for this request
+
+            if (response.success) {
+                setMessage('OTP resent successfully!');
+                toast.success('OTP resent successfully!');
+            } else {
+                throw new Error(response.message || 'Failed to resend OTP');
+            }
+        } catch (error: any) {
+            console.error('Resend OTP error:', error);
+            const errorMessage = error.message || 'Failed to resend OTP. Please try again.';
             setMessage(errorMessage);
             toast.error(errorMessage);
         }

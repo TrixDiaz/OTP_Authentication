@@ -3,18 +3,17 @@ import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import AuthCard from '@/components/authCard';
 import { useAuthStore } from '@/lib/authStore';
-import { cookieUtils } from '@/lib/cookies';
 
 export default function Pin() {
     const [ isLoading, setIsLoading ] = useState(false);
     const [ message, setMessage ] = useState<string>('');
     const navigate = useNavigate();
-    const email = useAuthStore((state) => state.email);
+    const { email, setEmail, clearFlowType, setTokens } = useAuthStore();
 
     // Redirect if no email is available
     useEffect(() => {
         if (!email) {
-            navigate('/login');
+            navigate('/login', { replace: true });
         }
     }, [ email, navigate ]);
 
@@ -35,51 +34,95 @@ export default function Pin() {
         setMessage('');
 
         try {
-            // Add your PIN verification logic here
-            // const response = await axios.post('http://localhost:3000/api/v1/auth/verify-pin', {
+            // TODO: Implement PIN verification API call when server endpoint is ready
+            // const response = await httpClient.post('/v1/auth/verify-pin', {
             //     email: email,
             //     pin: pin
-            // });
+            // }, false);
 
-            setMessage('PIN verified successfully!');
-            toast.success('PIN verified successfully!');
+            // Mock successful response for now
+            const mockResponse = {
+                success: true,
+                message: 'PIN verification successful',
+                accessToken: 'mock-access-token-pin-' + Date.now(),
+                refreshToken: 'mock-refresh-token-pin-' + Date.now(),
+                user: {
+                    id: 'mock-user-id',
+                    email: email,
+                    name: email.split('@')[ 0 ],
+                    isVerified: true,
+                    profileCompleted: false,
+                    hasCompletedProfile: false,
+                    createdAt: new Date().toISOString()
+                }
+            };
 
-            // Store tokens in cookies if available
-            // if (response.data.accessToken) {
-            //     cookieUtils.setTokens(response.data.accessToken, response.data.refreshToken);
-            // }
+            // Simulate API delay
+            await new Promise(resolve => setTimeout(resolve, 1000));
 
-            // Navigate to dashboard or main app
-            // navigate('/dashboard');
+            if (mockResponse.success) {
+                setMessage('PIN verification successful!');
+                toast.success('PIN verification successful!');
+
+                // Store tokens and user data using the enhanced auth store
+                if (mockResponse.accessToken && mockResponse.refreshToken) {
+                    setTokens(mockResponse.accessToken, mockResponse.refreshToken, mockResponse.user);
+
+                    // Small delay to ensure state is updated properly
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+
+                // Clean up auth flow data
+                setEmail('');
+                clearFlowType();
+
+                // Navigate to dashboard
+                setTimeout(() => {
+                    navigate('/dashboard', { replace: true });
+                }, 1000);
+            } else {
+                const errorMessage = mockResponse.message || 'Invalid PIN. Please try again.';
+                setMessage(errorMessage);
+                toast.error(errorMessage);
+            }
         } catch (error: any) {
-            const errorMessage = 'Invalid PIN. Please try again.';
+            console.error('PIN verification error:', error);
+
+            let errorMessage = 'An unexpected error occurred. Please try again.';
+
+            if (error.response?.data?.message) {
+                errorMessage = error.response.data.message;
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+
             setMessage(errorMessage);
             toast.error(errorMessage);
         } finally {
             setIsLoading(false);
         }
-    }, [ email, navigate ]);
+    }, [ email, navigate, setEmail, clearFlowType, setTokens ]);
 
     if (!email) {
-        return null; // Will redirect to login
+        return null; // Will redirect
     }
 
     return (
         <AuthCard
-            title='Security PIN'
-            description='Enter your Security PIN to login'
-            inputLabel='Security PIN'
-            inputType='text'
-            inputPlaceholder='Enter your 12 Combinations Digit PIN'
+            title="Enter your Security PIN"
+            description="Use your 4-digit Security PIN to sign in"
+            inputLabel="Security PIN"
+            inputType="password"
+            inputPlaceholder="Enter 4 Digit PIN"
             backIcon={true}
             backIconTo="/other-ways"
             tooltip={true}
-            tooltipText="Back to Other Ways to login"
-            buttonText={isLoading ? 'Submitting...' : 'Submit'}
-            buttonVariant='default'
-            linkText='Forgot PIN?'
-            linkAction='Reset'
-            linkTo='/login'
+            tooltipText="Back to Other Ways"
+            buttonText={isLoading ? 'Verifying...' : 'Sign In'}
+            buttonVariant="default"
+            linkText="Forgot your PIN?"
+            linkAction="Reset PIN"
+            linkTo="/forgot-password"
             showEmailBadge={true}
             onSubmit={handlePinSubmit}
             isLoading={isLoading}

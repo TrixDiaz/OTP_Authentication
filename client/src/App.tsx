@@ -10,60 +10,107 @@ import ForgotPassword from "@/pages/auth/forgot-password"
 import Home from "@/pages/Home"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { ProtectedRoute, PublicRoute, AuthInitializer } from "@/components/RouteGuards"
 
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <Login />,
+    element: (
+      <PublicRoute>
+        <Login />
+      </PublicRoute>
+    ),
   },
   {
     path: "/login",
-    element: <Login />,
+    element: (
+      <PublicRoute>
+        <Login />
+      </PublicRoute>
+    ),
   },
   {
     path: "/register",
-    element: <Register />,
+    element: (
+      <PublicRoute>
+        <Register />
+      </PublicRoute>
+    ),
   },
   {
     path: "/otp",
-    element: <Otp />,
+    element: (
+      <PublicRoute>
+        <Otp />
+      </PublicRoute>
+    ),
   },
   {
     path: "/pin",
-    element: <Pin />,
+    element: (
+      <PublicRoute>
+        <Pin />
+      </PublicRoute>
+    ),
   },
   {
     path: "/password",
-    element: <Password />,
+    element: (
+      <PublicRoute>
+        <Password />
+      </PublicRoute>
+    ),
   },
   {
     path: "/other-ways",
-    element: <OtherWays />,
+    element: (
+      <PublicRoute>
+        <OtherWays />
+      </PublicRoute>
+    ),
   },
   {
     path: "/send-code",
-    element: <SendCode />,
+    element: (
+      <PublicRoute>
+        <SendCode />
+      </PublicRoute>
+    ),
   },
   {
     path: "/forgot-password",
-    element: <ForgotPassword />,
+    element: (
+      <PublicRoute>
+        <ForgotPassword />
+      </PublicRoute>
+    ),
   },
   {
     path: "/home",
-    element: <Home />,
+    element: (
+      <ProtectedRoute>
+        <Home />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/dashboard",
-    element: <Home />,
+    element: (
+      <ProtectedRoute>
+        <Home />
+      </ProtectedRoute>
+    ),
   },
 ]);
 
 function App() {
   return (
-    <TooltipProvider>
-      <RouterProvider router={router} />
-      <Toaster />
-    </TooltipProvider>
+    <AuthInitializer>
+      <TooltipProvider>
+        <RouterProvider router={router} />
+        <Toaster />
+      </TooltipProvider>
+    </AuthInitializer>
   )
 }
 
