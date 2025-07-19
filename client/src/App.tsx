@@ -1,57 +1,69 @@
-import {Route, Routes} from "react-router-dom";
-import Login from "@/pages/auth/Login";
-import Register from "@/pages/auth/Register";
-import Otp from "@/pages/auth/otp";
-import Pin from "@/pages/auth/pin";
-import Password from "@/pages/auth/password";
-import OtherWays from "@/pages/auth/other-ways";
-import SendCode from "@/pages/auth/send-code";
-import ForgotPassword from "./pages/auth/forgot-password";
+import { createBrowserRouter, RouterProvider } from 'react-router'
+import Login from "@/pages/auth/Login"
+import Register from "@/pages/auth/Register"
+import Otp from "@/pages/auth/otp"
+import Pin from "@/pages/auth/pin"
+import Password from "@/pages/auth/password"
+import OtherWays from "@/pages/auth/other-ways"
+import SendCode from "@/pages/auth/send-code"
+import ForgotPassword from "@/pages/auth/forgot-password"
+import Home from "@/pages/Home"
+import { Toaster } from "@/components/ui/sonner"
+import { TooltipProvider } from "@/components/ui/tooltip"
 
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <Login />,
+  },
+  {
+    path: "/login",
+    element: <Login />,
+  },
+  {
+    path: "/register",
+    element: <Register />,
+  },
+  {
+    path: "/otp",
+    element: <Otp />,
+  },
+  {
+    path: "/pin",
+    element: <Pin />,
+  },
+  {
+    path: "/password",
+    element: <Password />,
+  },
+  {
+    path: "/other-ways",
+    element: <OtherWays />,
+  },
+  {
+    path: "/send-code",
+    element: <SendCode />,
+  },
+  {
+    path: "/forgot-password",
+    element: <ForgotPassword />,
+  },
+  {
+    path: "/home",
+    element: <Home />,
+  },
+  {
+    path: "/dashboard",
+    element: <Home />,
+  },
+]);
 
 function App() {
-
   return (
-    <>
-      <Routes>
-      <Route
-            path="/"
-            element={<Login/>}
-          />
-        <Route
-            path="/login"
-            element={<Login/>}
-          />
-            <Route
-              path="/register"
-              element={<Register/>}
-            />
-            <Route
-              path="/otp"
-              element={<Otp/>}
-            />
-            <Route
-              path="/pin"
-              element={<Pin/>}
-            />
-            <Route
-              path="/password"
-              element={<Password/>}
-            />
-            <Route
-              path="/other-ways"
-              element={<OtherWays/>}
-            />
-            <Route
-              path="/send-code"
-              element={<SendCode/>}
-            />
-            <Route
-              path="/forgot-password"
-              element={<ForgotPassword/>}
-            />
-      </Routes>
-    </>
+    <TooltipProvider>
+      <RouterProvider router={router} />
+      <Toaster />
+    </TooltipProvider>
   )
 }
 
