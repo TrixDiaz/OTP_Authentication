@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { Logo } from '@/components/logo';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,6 @@ export default function Home() {
             clearEmail();
         }
 
-        toast.success('Welcome to your dashboard!');
     }, [ authEmail, clearEmail ]);
 
     const handleLogout = async () => {
@@ -147,18 +146,16 @@ export default function Home() {
                                 Manage your account settings
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-3">
-                            <Button variant="outline" className="w-full justify-start">
-                                <User className="w-4 h-4 mr-2" />
-                                Edit Profile
-                            </Button>
+                        <CardContent className="flex flex-col gap-2">
+                            <Link to="/profile">
+                                <Button variant="outline" className="w-full justify-start">
+                                    <User className="w-4 h-4 mr-2" />
+                                    Edit Profile
+                                </Button>
+                            </Link>
                             <Button variant="outline" className="w-full justify-start">
                                 <Shield className="w-4 h-4 mr-2" />
                                 Security Settings
-                            </Button>
-                            <Button variant="outline" className="w-full justify-start">
-                                <Mail className="w-4 h-4 mr-2" />
-                                Email Preferences
                             </Button>
                         </CardContent>
                     </Card>

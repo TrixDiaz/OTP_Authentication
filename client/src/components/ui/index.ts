@@ -5,4 +5,16 @@ export { Label } from './label';
 export { Badge } from './badge';
 export { Spinner } from './spinner';
 export { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from './tooltip';
-export { Toaster } from './sonner'; 
+export { Toaster } from './sonner';
+export {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogOverlay,
+    DialogPortal,
+    DialogTitle,
+    DialogTrigger
+} from './dialog'; 

@@ -10,9 +10,17 @@ import {
     Button,
     Input,
     Label,
-    Spinner
+    Spinner,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
 } from '../components/ui';
 import { toast } from 'sonner';
+import { ArrowLeftIcon } from 'lucide-react';
+import { Link } from 'react-router';
 
 interface User {
     id: string;
@@ -88,6 +96,10 @@ const Profile: React.FC = () => {
         pin: false,
         delete: false
     });
+
+    // Delete account dialog state
+    const [ deleteDialogOpen, setDeleteDialogOpen ] = useState(false);
+    const [ deleteConfirmText, setDeleteConfirmText ] = useState('');
 
     // Initialize profile data from auth store
     useEffect(() => {
@@ -297,17 +309,10 @@ const Profile: React.FC = () => {
 
     // Delete account
     const handleDeleteAccount = async () => {
-        const confirmDelete = window.confirm(
-            'Are you sure you want to delete your account? This action cannot be undone.'
-        );
-
-        if (!confirmDelete) return;
-
-        const finalConfirm = window.confirm(
-            'This will permanently delete all your data. Type "DELETE" to confirm.'
-        );
-
-        if (!finalConfirm) return;
+        if (deleteConfirmText !== 'DELETE') {
+            toast.error('Please type "DELETE" to confirm account deletion');
+            return;
+        }
 
         try {
             setLoadingStates(prev => ({ ...prev, delete: true }));
@@ -316,6 +321,7 @@ const Profile: React.FC = () => {
 
             if (response.success) {
                 toast.success('Account deleted successfully');
+                setDeleteDialogOpen(false);
                 logout();
                 // Redirect will happen automatically from logout
             } else {
@@ -327,6 +333,12 @@ const Profile: React.FC = () => {
         } finally {
             setLoadingStates(prev => ({ ...prev, delete: false }));
         }
+    };
+
+    // Handle dialog close
+    const handleDeleteDialogClose = () => {
+        setDeleteDialogOpen(false);
+        setDeleteConfirmText('');
     };
 
     if (!user || !currentUser) {
@@ -341,10 +353,20 @@ const Profile: React.FC = () => {
         <div className="container mx-auto py-8 px-4 max-w-4xl">
             <div className="space-y-6">
                 {/* Header */}
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900">Profile Settings</h1>
-                    <p className="text-gray-600 mt-2">Manage your account settings and preferences</p>
+                <div className="flex justify-between items-center">
+                    <div className="mb-8">
+                        <h1 className="text-3xl font-bold text-gray-900">Profile Settings</h1>
+                        <p className="text-gray-600 mt-2">Manage your account settings and preferences</p>
+                    </div>
+                    <div>
+                        <Button variant="outline">
+                            <Link to="/home">
+                                <ArrowLeftIcon className="w-4 h-4" />
+                            </Link>
+                        </Button>
+                    </div>
                 </div>
+
 
                 {/* Profile Information */}
                 <Card>
@@ -642,24 +664,79 @@ const Profile: React.FC = () => {
                                 </p>
                                 <Button
                                     variant="destructive"
-                                    onClick={handleDeleteAccount}
+                                    onClick={() => setDeleteDialogOpen(true)}
                                     disabled={loadingStates.delete}
                                     className="w-full md:w-auto"
                                 >
-                                    {loadingStates.delete ? (
-                                        <>
-                                            <Spinner className="w-4 h-4 mr-2" />
-                                            Deleting...
-                                        </>
-                                    ) : (
-                                        'Delete Account'
-                                    )}
+                                    Delete Account
                                 </Button>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Delete Account Confirmation Dialog */}
+            <Dialog open={deleteDialogOpen} onOpenChange={handleDeleteDialogClose}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="text-red-600">Delete Account</DialogTitle>
+                        <DialogDescription>
+                            This action cannot be undone. This will permanently delete your account and all associated data.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-4">
+                        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                            <p className="text-sm text-red-800 font-medium">
+                                ⚠️ Warning: This will permanently delete:
+                            </p>
+                            <ul className="list-disc list-inside text-sm text-red-700 mt-2 space-y-1">
+                                <li>Your profile and account information</li>
+                                <li>All your data and settings</li>
+                                <li>Your login credentials</li>
+                            </ul>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="delete-confirm" className="text-sm font-medium">
+                                Type <span className="font-mono bg-gray-100 px-1 rounded">DELETE</span> to confirm:
+                            </Label>
+                            <Input
+                                id="delete-confirm"
+                                value={deleteConfirmText}
+                                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                                placeholder="Type DELETE here"
+                                className="font-mono"
+                            />
+                        </div>
+                    </div>
+
+                    <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={handleDeleteDialogClose}
+                            disabled={loadingStates.delete}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleDeleteAccount}
+                            disabled={loadingStates.delete || deleteConfirmText !== 'DELETE'}
+                        >
+                            {loadingStates.delete ? (
+                                <>
+                                    <Spinner className="w-4 h-4 mr-2" />
+                                    Deleting...
+                                </>
+                            ) : (
+                                'Delete Account'
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };
