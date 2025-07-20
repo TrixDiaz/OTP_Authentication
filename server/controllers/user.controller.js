@@ -178,11 +178,9 @@ export const updatePassword = async (req, res, next) => {
     const {oldPassword, newPassword} = req.body;
     const userId = req.user.userId;
 
-    // Validate required fields
-    if (!oldPassword || !newPassword) {
-      const error = new Error(
-        "Both old password and new password are required"
-      );
+    // Validate new password is provided
+    if (!newPassword) {
+      const error = new Error("New password is required");
       error.statusCode = 400;
       return next(error);
     }
@@ -204,39 +202,53 @@ export const updatePassword = async (req, res, next) => {
       return next(error);
     }
 
-    if (!user.password) {
-      const error = new Error("Please complete your profile first");
-      error.statusCode = 400;
-      return next(error);
+    // Check if user already has a password
+    const isCreatingPassword = !user.password;
+
+    if (user.password) {
+      // User has existing password - require old password for update
+      if (!oldPassword) {
+        const error = new Error("Current password is required to update");
+        error.statusCode = 400;
+        return next(error);
+      }
+
+      // Verify old password
+      const isMatch = await bcryptjs.compare(oldPassword, user.password);
+      if (!isMatch) {
+        const error = new Error("Current password is incorrect");
+        error.statusCode = 400;
+        return next(error);
+      }
+
+      // Check if new password is different
+      const isSamePassword = await bcryptjs.compare(newPassword, user.password);
+      if (isSamePassword) {
+        const error = new Error(
+          "New password must be different from the current password"
+        );
+        error.statusCode = 400;
+        return next(error);
+      }
     }
 
-    // Verify old password
-    const isMatch = await bcryptjs.compare(oldPassword, user.password);
-    if (!isMatch) {
-      const error = new Error("Old password is incorrect");
-      error.statusCode = 400;
-      return next(error);
-    }
-
-    // Check if new password is different
-    const isSamePassword = await bcryptjs.compare(newPassword, user.password);
-    if (isSamePassword) {
-      const error = new Error(
-        "New password must be different from the old password"
-      );
-      error.statusCode = 400;
-      return next(error);
-    }
-
-    // Hash and update password
+    // Hash and set password (works for both create and update)
     const saltRounds = 12;
     const hashedPassword = await bcryptjs.hash(newPassword, saltRounds);
     user.password = hashedPassword;
+
+    // Update profile completion status if this is their first password
+    if (!user.profileCompleted && user.name && user.pin) {
+      user.profileCompleted = true;
+    }
+
     await user.save();
 
     res.status(200).json({
       success: true,
-      message: "Password updated successfully",
+      message: isCreatingPassword
+        ? "Password created successfully"
+        : "Password updated successfully",
     });
   } catch (error) {
     next(error);
@@ -248,9 +260,9 @@ export const updatePin = async (req, res, next) => {
     const {oldPin, newPin} = req.body;
     const userId = req.user.userId;
 
-    // Validate required fields
-    if (!oldPin || !newPin) {
-      const error = new Error("Both old PIN and new PIN are required");
+    // Validate new PIN is provided
+    if (!newPin) {
+      const error = new Error("New PIN is required");
       error.statusCode = 400;
       return next(error);
     }
@@ -270,37 +282,53 @@ export const updatePin = async (req, res, next) => {
       return next(error);
     }
 
-    if (!user.pin) {
-      const error = new Error("Please complete your profile first");
-      error.statusCode = 400;
-      return next(error);
+    // Check if user already has a PIN
+    const isCreatingPin = !user.pin;
+
+    if (user.pin) {
+      // User has existing PIN - require old PIN for update
+      if (!oldPin) {
+        const error = new Error("Current PIN is required to update");
+        error.statusCode = 400;
+        return next(error);
+      }
+
+      // Verify old PIN
+      const isMatch = await bcryptjs.compare(oldPin, user.pin);
+      if (!isMatch) {
+        const error = new Error("Current PIN is incorrect");
+        error.statusCode = 400;
+        return next(error);
+      }
+
+      // Check if new PIN is different
+      const isSamePin = await bcryptjs.compare(newPin, user.pin);
+      if (isSamePin) {
+        const error = new Error(
+          "New PIN must be different from the current PIN"
+        );
+        error.statusCode = 400;
+        return next(error);
+      }
     }
 
-    // Verify old PIN
-    const isMatch = await bcryptjs.compare(oldPin, user.pin);
-    if (!isMatch) {
-      const error = new Error("Old PIN is incorrect");
-      error.statusCode = 400;
-      return next(error);
-    }
-
-    // Check if new PIN is different
-    const isSamePin = await bcryptjs.compare(newPin, user.pin);
-    if (isSamePin) {
-      const error = new Error("New PIN must be different from the old PIN");
-      error.statusCode = 400;
-      return next(error);
-    }
-
-    // Hash and update PIN
+    // Hash and set PIN (works for both create and update)
     const saltRounds = 12;
     const hashedPin = await bcryptjs.hash(newPin, saltRounds);
     user.pin = hashedPin;
+
+    // Update profile completion status if this is their first PIN
+    if (!user.profileCompleted && user.name && user.password) {
+      user.profileCompleted = true;
+    }
+
     await user.save();
 
     res.status(200).json({
       success: true,
-      message: "PIN updated successfully",
+      message: isCreatingPin
+        ? "PIN created successfully"
+        : "PIN updated successfully",
     });
   } catch (error) {
     next(error);

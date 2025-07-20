@@ -10,7 +10,7 @@ import {
   updatePassword,
   updatePin,
 } from "../controllers/user.controller.js";
-import {authenticateToken} from "../controllers/auth.controller.js";
+import authorize from "../middlewares/auth.middleware.js";
 
 const userRouter = Router();
 
@@ -20,31 +20,31 @@ userRouter.get("/", getUsers);
 
 // ===== AUTHENTICATED ROUTES =====
 // Get current user profile
-userRouter.get("/me", authenticateToken, getCurrentUser);
+userRouter.get("/me", authorize, getCurrentUser);
 
 // Complete user profile (after OTP verification)
-userRouter.post("/complete-profile", authenticateToken, completeProfile);
+userRouter.post("/complete-profile", authorize, completeProfile);
 
 // Update profile information
-userRouter.put("/profile", authenticateToken, updateProfile);
+userRouter.put("/profile", authorize, updateProfile);
 
 // Update password
-userRouter.put("/password", authenticateToken, updatePassword);
+userRouter.put("/password", authorize, updatePassword);
 
 // Update PIN
-userRouter.put("/pin", authenticateToken, updatePin);
+userRouter.put("/pin", authorize, updatePin);
 
 // Delete current user account
-userRouter.delete("/me", authenticateToken, deleteUser);
+userRouter.delete("/me", authorize, deleteUser);
 
 // ===== ADMIN ROUTES (with ID parameters) =====
 // Fetch a single user by ID (admin only)
-userRouter.get("/:id", authenticateToken, getUser);
+userRouter.get("/:id", authorize, getUser);
 
 // Update an existing user by ID (admin only)
-userRouter.put("/:id", authenticateToken, updateUser);
+userRouter.put("/:id", authorize, updateUser);
 
 // Delete a user by ID (admin only)
-userRouter.delete("/:id", authenticateToken, deleteUser);
+userRouter.delete("/:id", authorize, deleteUser);
 
 export default userRouter;

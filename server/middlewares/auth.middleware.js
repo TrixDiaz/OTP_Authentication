@@ -37,7 +37,7 @@ const authorize = async (req, res, next) => {
     }
 
     // Attach the user to the request object
-    req.user = user;
+    req.user = { userId: user._id, ...user.toObject() };
     next();
   } catch (error) {
     res.status(401).json({

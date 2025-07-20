@@ -1,7 +1,7 @@
 import express from "express";
 import cookieParser from "cookie-parser";
 import connectToDatabase from "./database/mongodb.js";
-import cors from "cors";
+import corsOptions from "./config/cors.js";
 
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
@@ -16,18 +16,10 @@ app.use(express.json());
 app.use(express.urlencoded({extended: true}));
 app.use(cookieParser());
 
-// Configure CORS to allow credentials and cookies
-app.use(
-  cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173", // Allow client origin
-    credentials: true, // Allow cookies to be sent
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
-    exposedHeaders: ["Set-Cookie"],
-  })
-);
+// Configure CORS
+app.use(cors(corsOptions));
 
-// app.use(ratelimiter);
+app.use(ratelimiter);
 
 //routes
 app.use("/api/v1/auth", authRoutes);
