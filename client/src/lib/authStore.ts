@@ -11,8 +11,7 @@ const cookieStorage = {
         const value = document.cookie
             .split('; ')
             .find(row => row.startsWith(`${name}=`))
-            ?.split('=')
-        [ 1 ];
+            ?.split('=')[ 1 ];
 
         return value ? decodeURIComponent(value) : null;
     },
@@ -39,6 +38,30 @@ const cookieStorage = {
     }
 };
 
+// Helper function to check if auth cookie exists
+// Since we're using HTTP-only cookies, we need to check server-side validation
+const hasAuthCookie = (): boolean => {
+    if (typeof document === 'undefined') return false;
+
+    // We can't read HTTP-only cookies from JavaScript
+    // Instead, we'll rely on the server validation endpoint
+    // This is a fallback that checks if we have any stored auth data
+    const cookieValue = cookieStorage.getItem('fastlink-auth');
+    if (!cookieValue) return false;
+
+    try {
+        const parsedData = JSON.parse(cookieValue);
+        // Check that user data exists (tokens are now in HTTP-only cookies)
+        return !!(
+            parsedData?.state?.user &&
+            parsedData.state.user !== null &&
+            Object.keys(parsedData.state.user).length > 0
+        );
+    } catch {
+        return false;
+    }
+};
+
 interface User {
     id: string;
     email: string;
@@ -53,6 +76,8 @@ interface AuthState {
     // Loading and initialization states
     isLoading: boolean;
     isInitialized: boolean;
+    isHydrated: boolean;
+    isInitializing: boolean; // Add flag to prevent multiple init calls
 
     // User state
     user: User | null;
@@ -60,10 +85,6 @@ interface AuthState {
     // Existing auth flow state
     email: string;
     flowType: AuthFlowType | null;
-
-    // Token management state
-    accessToken: string | null;
-    refreshToken: string | null;
 
     // Auth flow actions
     setEmail: (email: string) => void;
@@ -75,21 +96,21 @@ interface AuthState {
     // Loading state actions
     setLoading: (loading: boolean) => void;
     setInitialized: (initialized: boolean) => void;
+    setHydrated: (hydrated: boolean) => void;
+    setInitializing: (initializing: boolean) => void;
 
     // User actions
     setUser: (user: User) => void;
     clearUser: () => void;
 
-    // Token management actions
-    setTokens: (accessToken: string, refreshToken: string, user?: User) => void;
-    getTokens: () => { accessToken: string | null; refreshToken: string | null };
-    clearTokens: () => void;
-    getAccessToken: () => string | null;
-    getRefreshToken: () => string | null;
+    // Authentication actions
     isAuthenticated: () => boolean;
 
     // Initialize auth state
     initialize: () => Promise<void>;
+
+    // Check if user has auth cookie (before rehydration)
+    hasAuthCookie: () => boolean;
 
     // Validate token with server
     validateTokenWithServer: () => Promise<boolean>;
@@ -107,15 +128,17 @@ export const useAuthStore = create<AuthState>()(
             // Initial state
             isLoading: false,
             isInitialized: false,
+            isHydrated: false,
+            isInitializing: false,
             user: null,
             email: '',
             flowType: null,
-            accessToken: null,
-            refreshToken: null,
 
             // Loading state actions
             setLoading: (loading: boolean) => set({ isLoading: loading }),
             setInitialized: (initialized: boolean) => set({ isInitialized: initialized }),
+            setHydrated: (hydrated: boolean) => set({ isHydrated: hydrated }),
+            setInitializing: (initializing: boolean) => set({ isInitializing: initializing }),
 
             // User actions
             setUser: (user: User) => set({ user }),
@@ -129,67 +152,66 @@ export const useAuthStore = create<AuthState>()(
             clearAll: () => set({
                 email: '',
                 flowType: null,
-                accessToken: null,
-                refreshToken: null,
                 user: null,
                 isLoading: false
             }),
 
-            // Token management actions
-            setTokens: (accessToken: string, refreshToken: string, user?: User) => {
-                set({
-                    accessToken,
-                    refreshToken,
-                    user: user || get().user
-                });
-            },
-
-            getTokens: () => {
-                const state = get();
-                return {
-                    accessToken: state.accessToken,
-                    refreshToken: state.refreshToken
-                };
-            },
-
-            clearTokens: () => {
-                set({
-                    accessToken: null,
-                    refreshToken: null,
-                    user: null
-                });
-            },
-
-            getAccessToken: () => {
-                return get().accessToken;
-            },
-
-            getRefreshToken: () => {
-                return get().refreshToken;
-            },
-
+            // Authentication check
             isAuthenticated: () => {
                 const state = get();
-                return !!state.accessToken && !!state.user;
+                // Check if we have user data (tokens are in HTTP-only cookies)
+                if (state.user) {
+                    return true;
+                }
+                // If not hydrated yet, check if auth cookie exists as fallback
+                if (!state.isHydrated) {
+                    return hasAuthCookie();
+                }
+                return false;
             },
 
-            // Initialize auth state on app startup
-            initialize: async () => {
-                const { setLoading, setInitialized, accessToken } = get();
+            // Check if auth cookie exists (before full rehydration)
+            hasAuthCookie: () => {
+                return hasAuthCookie();
+            },
 
+            // Initialize auth state on app startup - prevent multiple calls
+            initialize: async () => {
+                const state = get();
+
+                // Prevent multiple initialization calls
+                if (state.isInitialized || state.isInitializing) {
+                    return;
+                }
+
+                const { setLoading, setInitialized, setInitializing } = get();
+
+                setInitializing(true);
                 setLoading(true);
 
                 try {
-                    // If we have a token, validate it with the server
-                    if (accessToken) {
-                        const isValid = await get().validateTokenWithServer();
-                        if (!isValid) {
-                            // Token is invalid, try to refresh
-                            const refreshSuccess = await get().refreshTokens();
-                            if (!refreshSuccess) {
-                                // Refresh failed, clear all auth data
-                                get().clearAll();
-                            }
+                    // Wait for rehydration to complete if not already done
+                    let attempts = 0;
+                    const maxAttempts = 100; // 1 second max wait
+
+                    while (!get().isHydrated && attempts < maxAttempts) {
+                        await new Promise(resolve => setTimeout(resolve, 10));
+                        attempts++;
+                    }
+
+                    // Always validate with server to check if user is authenticated
+                    // This will handle cases where:
+                    // 1. User has local data but server tokens are expired
+                    // 2. User has HTTP-only cookies but no local data
+                    // 3. User has both and everything is valid
+                    const isValid = await get().validateTokenWithServer();
+
+                    if (!isValid) {
+                        // Try to refresh tokens if validation failed
+                        const refreshSuccess = await get().refreshTokens();
+                        if (!refreshSuccess) {
+                            // Refresh failed, clear all auth data
+                            get().clearAll();
                         }
                     }
                 } catch (error) {
@@ -198,24 +220,21 @@ export const useAuthStore = create<AuthState>()(
                 } finally {
                     setLoading(false);
                     setInitialized(true);
+                    setInitializing(false);
                 }
             },
 
             // Validate token with server - using native fetch to avoid circular dependency
             validateTokenWithServer: async () => {
-                const { accessToken, setUser, clearTokens } = get();
-
-                if (!accessToken) {
-                    return false;
-                }
+                const { setUser, clearUser } = get();
 
                 try {
-                    const response = await fetch('http://localhost:3000/api/auth/validate-token', {
+                    const response = await fetch('http://localhost:3000/api/v1/auth/validate-token', {
                         method: 'GET',
                         headers: {
-                            'Authorization': `Bearer ${accessToken}`,
                             'Content-Type': 'application/json'
-                        }
+                        },
+                        credentials: 'include' // Include HTTP-only cookies
                     });
 
                     if (response.ok) {
@@ -227,46 +246,43 @@ export const useAuthStore = create<AuthState>()(
                     }
 
                     // Token is invalid
-                    clearTokens();
+                    clearUser();
                     return false;
                 } catch (error) {
                     console.error('Token validation failed:', error);
-                    clearTokens();
+                    clearUser();
                     return false;
                 }
             },
 
             // Refresh tokens - using native fetch to avoid circular dependency
             refreshTokens: async () => {
-                const { refreshToken, setTokens, clearTokens } = get();
-
-                if (!refreshToken) {
-                    return false;
-                }
+                const { clearUser } = get();
 
                 try {
-                    const response = await fetch('http://localhost:3000/api/auth/refresh-token', {
+                    const response = await fetch('http://localhost:3000/api/v1/auth/refresh-token', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ refreshToken })
+                        credentials: 'include' // Include HTTP-only cookies
                     });
 
                     if (response.ok) {
                         const data = await response.json();
-                        if (data.success && data.accessToken && data.refreshToken) {
-                            setTokens(data.accessToken, data.refreshToken);
-                            return true;
+                        if (data.success) {
+                            // Tokens are now set as HTTP-only cookies by the server
+                            // Validate again to get updated user data
+                            return await get().validateTokenWithServer();
                         }
                     }
 
                     // Refresh failed
-                    clearTokens();
+                    clearUser();
                     return false;
                 } catch (error) {
                     console.error('Token refresh failed:', error);
-                    clearTokens();
+                    clearUser();
                     return false;
                 }
             },
@@ -276,12 +292,13 @@ export const useAuthStore = create<AuthState>()(
                 const { clearAll } = get();
 
                 try {
-                    // Call server logout endpoint if needed
-                    await fetch('http://localhost:3000/api/auth/signout', {
+                    // Call server logout endpoint to clear HTTP-only cookies
+                    await fetch('http://localhost:3000/api/v1/auth/sign-out', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
-                        }
+                        },
+                        credentials: 'include' // Include HTTP-only cookies
                     });
                 } catch (error) {
                     console.error('Logout API call failed:', error);
@@ -294,13 +311,18 @@ export const useAuthStore = create<AuthState>()(
         {
             name: 'fastlink-auth', // Cookie name prefix
             storage: createJSONStorage(() => cookieStorage),
-            // Only persist token data, user, and email for auth flow
+            // Only persist user data and email for auth flow (tokens are in HTTP-only cookies)
             partialize: (state) => ({
-                accessToken: state.accessToken,
-                refreshToken: state.refreshToken,
                 user: state.user,
                 email: state.email
             }),
+            // Handle rehydration completion
+            onRehydrateStorage: () => (state) => {
+                // Mark as hydrated when rehydration is complete
+                if (state) {
+                    state.setHydrated(true);
+                }
+            },
         }
     )
 ); 

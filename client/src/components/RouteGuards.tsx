@@ -23,23 +23,31 @@ export const ProtectedRoute: React.FC<RouteGuardProps> = ({ children }) => {
     const {
         isLoading,
         isInitialized,
+        isHydrated,
+        isInitializing,
         isAuthenticated,
+        hasAuthCookie,
         initialize
     } = useAuthStore();
 
     useEffect(() => {
-        // Initialize auth state if not already done
-        if (!isInitialized && !isLoading) {
+        // Only initialize if not already done or in progress
+        if (!isInitialized && !isInitializing && !isLoading) {
             initialize();
         }
-    }, [ isInitialized, isLoading, initialize ]);
+    }, [ isInitialized, isInitializing, isLoading, initialize ]);
 
-    // Show loading spinner while checking authentication
-    if (!isInitialized || isLoading) {
+    // Check if we have auth cookie early (before full hydration)
+    const hasValidCookie = hasAuthCookie();
+
+    // Show loading while any auth process is happening
+    const isAuthProcessing = isLoading || isInitializing || !isInitialized || (!isHydrated && hasValidCookie);
+
+    if (isAuthProcessing) {
         return <AuthLoadingSpinner />;
     }
 
-    // Redirect to login if not authenticated
+    // Only redirect when auth state is fully stable
     if (!isAuthenticated()) {
         return <Navigate
             to="/login"
@@ -57,23 +65,31 @@ export const PublicRoute: React.FC<RouteGuardProps> = ({ children }) => {
     const {
         isLoading,
         isInitialized,
+        isHydrated,
+        isInitializing,
         isAuthenticated,
+        hasAuthCookie,
         initialize
     } = useAuthStore();
 
     useEffect(() => {
-        // Initialize auth state if not already done
-        if (!isInitialized && !isLoading) {
+        // Only initialize if not already done or in progress
+        if (!isInitialized && !isInitializing && !isLoading) {
             initialize();
         }
-    }, [ isInitialized, isLoading, initialize ]);
+    }, [ isInitialized, isInitializing, isLoading, initialize ]);
 
-    // Show loading spinner while checking authentication
-    if (!isInitialized || isLoading) {
+    // Check if we have auth cookie early (before full hydration)
+    const hasValidCookie = hasAuthCookie();
+
+    // Show loading while any auth process is happening, but only if we have a cookie
+    const isAuthProcessing = (isLoading || isInitializing || !isInitialized || (!isHydrated && hasValidCookie));
+
+    if (isAuthProcessing) {
         return <AuthLoadingSpinner />;
     }
 
-    // Redirect to intended page or home if already authenticated
+    // Only redirect when auth state is fully stable and user is authenticated
     if (isAuthenticated()) {
         const intendedPath = location.state?.from || '/home';
         return <Navigate to={intendedPath} replace />;
@@ -87,18 +103,26 @@ export const AuthInitializer: React.FC<RouteGuardProps> = ({ children }) => {
     const {
         isLoading,
         isInitialized,
+        isHydrated,
+        isInitializing,
+        hasAuthCookie,
         initialize
     } = useAuthStore();
 
     useEffect(() => {
-        // Initialize auth state on app startup
-        if (!isInitialized && !isLoading) {
+        // Only initialize if not already done or in progress
+        if (!isInitialized && !isInitializing && !isLoading) {
             initialize();
         }
-    }, [ isInitialized, isLoading, initialize ]);
+    }, [ isInitialized, isInitializing, isLoading, initialize ]);
 
-    // Show loading spinner during initial auth check
-    if (!isInitialized || isLoading) {
+    // Check if we have auth cookie early (before full hydration)
+    const hasValidCookie = hasAuthCookie();
+
+    // Show loading while any auth process is happening, but only if we have a cookie
+    const isAuthProcessing = isLoading || isInitializing || !isInitialized || (!isHydrated && hasValidCookie);
+
+    if (isAuthProcessing) {
         return <AuthLoadingSpinner />;
     }
 

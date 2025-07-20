@@ -9,7 +9,7 @@ export default function Otp() {
     const [ isLoading, setIsLoading ] = useState(false);
     const [ message, setMessage ] = useState<string>('');
     const navigate = useNavigate();
-    const { email, flowType, setEmail, clearFlowType, setTokens } = useAuthStore();
+    const { email, flowType, setEmail, clearFlowType, setUser } = useAuthStore();
 
     // Redirect if no email or flow type is available
     useEffect(() => {
@@ -36,8 +36,8 @@ export default function Otp() {
 
         try {
             const endpoint = flowType === 'register'
-                ? '/v1/auth/verify-registration-otp'
-                : '/v1/auth/verify-login-otp';
+                ? '/auth/verify-registration-otp'
+                : '/auth/verify-login-otp';
 
             const response = await httpClient.post(endpoint, {
                 email: email,
@@ -53,23 +53,17 @@ export default function Otp() {
                 setMessage(successMessage);
                 toast.success(successMessage);
 
-                // Store tokens and user data using the enhanced auth store
-                if (response.accessToken && response.refreshToken) {
-                    // The new setTokens method accepts user data as third parameter
-                    setTokens(response.accessToken, response.refreshToken, response.user);
-
-                    // Small delay to ensure state is updated properly
-                    await new Promise(resolve => setTimeout(resolve, 100));
+                // Store user data (tokens are now set as HTTP-only cookies by server)
+                if (response.user) {
+                    setUser(response.user);
                 }
 
                 // Clean up auth flow data - user is now authenticated
                 setEmail('');
                 clearFlowType();
 
-                // Navigate to dashboard after successful verification
-                setTimeout(() => {
-                    navigate('/dashboard', { replace: true });
-                }, 1000);
+                // Let the PublicRoute guard automatically redirect to home
+                // since the user is now authenticated
             } else {
                 const errorMessage = response.message || 'Invalid OTP. Please try again.';
                 setMessage(errorMessage);
@@ -92,15 +86,15 @@ export default function Otp() {
         } finally {
             setIsLoading(false);
         }
-    }, [ email, flowType, navigate, setEmail, clearFlowType, setTokens ]);
+    }, [ email, flowType, navigate, setEmail, clearFlowType, setUser ]);
 
     const handleResendOtp = useCallback(async () => {
         if (!email || !flowType) return;
 
         try {
             const endpoint = flowType === 'register'
-                ? '/v1/auth/send-registration-otp'
-                : '/v1/auth/send-login-otp';
+                ? '/auth/send-registration-otp'
+                : '/auth/send-login-otp';
 
             const response = await httpClient.post(endpoint, {
                 email: email

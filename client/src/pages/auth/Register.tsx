@@ -31,7 +31,7 @@ export default function Register() {
 
         try {
             // Check if user exists by trying to send registration OTP
-            const response = await httpClient.post('/v1/auth/send-registration-otp', {
+            const response = await httpClient.post('/auth/send-registration-otp', {
                 email: email
             }, false); // Don't require auth for this request
 

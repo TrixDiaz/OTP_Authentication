@@ -31,8 +31,8 @@ export default function SendCode() {
 
         try {
             const endpoint = flowType === 'register'
-                ? '/v1/auth/send-registration-otp'
-                : '/v1/auth/send-login-otp';
+                ? '/auth/send-registration-otp'
+                : '/auth/send-login-otp';
 
             const response = await httpClient.post(endpoint, {
                 email: email

@@ -30,7 +30,7 @@ export default function ForgotPassword() {
         setMessage('');
 
         try {
-            const response = await httpClient.post('/v1/auth/send-password-reset-otp', {
+            const response = await httpClient.post('/auth/send-password-reset-otp', {
                 email: email
             }, false); // Don't require auth for this request
 

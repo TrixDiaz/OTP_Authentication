@@ -108,10 +108,10 @@ function App() {
     <AuthInitializer>
       <TooltipProvider>
         <RouterProvider router={router} />
-        <Toaster />
+        <Toaster richColors position="top-center" />
       </TooltipProvider>
     </AuthInitializer>
-  )
+  );
 }
 
-export default App
+export default App;

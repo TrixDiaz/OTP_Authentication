@@ -8,7 +8,7 @@ export default function Password() {
     const [ isLoading, setIsLoading ] = useState(false);
     const [ message, setMessage ] = useState<string>('');
     const navigate = useNavigate();
-    const { email, setEmail, clearFlowType, setTokens } = useAuthStore();
+    const { email, setEmail, clearFlowType, setUser } = useAuthStore();
 
     // Redirect if no email is available
     useEffect(() => {
@@ -35,7 +35,7 @@ export default function Password() {
 
         try {
             // TODO: Implement password verification API call when server endpoint is ready
-            // const response = await httpClient.post('/v1/auth/verify-password', {
+            // const response = await httpClient.post('/auth/verify-password', {
             //     email: email,
             //     password: password
             // }, false);
@@ -64,22 +64,17 @@ export default function Password() {
                 setMessage('Password verification successful!');
                 toast.success('Password verification successful!');
 
-                // Store tokens and user data using the enhanced auth store
-                if (mockResponse.accessToken && mockResponse.refreshToken) {
-                    setTokens(mockResponse.accessToken, mockResponse.refreshToken, mockResponse.user);
-
-                    // Small delay to ensure state is updated properly
-                    await new Promise(resolve => setTimeout(resolve, 100));
+                // Store user data (tokens would be set as HTTP-only cookies by server)
+                if (mockResponse.user) {
+                    setUser(mockResponse.user);
                 }
 
                 // Clean up auth flow data
                 setEmail('');
                 clearFlowType();
 
-                // Navigate to dashboard
-                setTimeout(() => {
-                    navigate('/dashboard', { replace: true });
-                }, 1000);
+                // Let the PublicRoute guard automatically redirect to home
+                // since the user is now authenticated
             } else {
                 const errorMessage = mockResponse.message || 'Invalid password. Please try again.';
                 setMessage(errorMessage);
@@ -101,7 +96,7 @@ export default function Password() {
         } finally {
             setIsLoading(false);
         }
-    }, [ email, navigate, setEmail, clearFlowType, setTokens ]);
+    }, [ email, navigate, setEmail, clearFlowType, setUser ]);
 
     if (!email) {
         return null; // Will redirect

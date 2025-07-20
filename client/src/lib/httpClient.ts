@@ -1,7 +1,7 @@
 import { useAuthStore } from './authStore';
 
 // API base URL - should be moved to environment config
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = 'http://localhost:3000/api/v1';
 
 interface RequestConfig {
     method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
@@ -21,7 +21,7 @@ class HttpClient {
     private baseURL: string;
     private isRefreshing: boolean = false;
     private failedQueue: Array<{
-        resolve: (token: string) => void;
+        resolve: () => void;
         reject: (error: any) => void;
     }> = [];
 
@@ -29,38 +29,30 @@ class HttpClient {
         this.baseURL = baseURL;
     }
 
-    private processQueue(error: any, token: string | null = null) {
+    private processQueue(error: any) {
         this.failedQueue.forEach(({ resolve, reject }) => {
             if (error) {
                 reject(error);
             } else {
-                resolve(token!);
+                resolve();
             }
         });
 
         this.failedQueue = [];
     }
 
-    private async refreshToken(): Promise<string | null> {
-        const { refreshTokens, getRefreshToken } = useAuthStore.getState();
-
-        if (!getRefreshToken()) {
-            throw new Error('No refresh token available');
-        }
+    private async refreshToken(): Promise<boolean> {
+        const { refreshTokens } = useAuthStore.getState();
 
         try {
             const success = await refreshTokens();
-            if (success) {
-                const { getAccessToken } = useAuthStore.getState();
-                return getAccessToken();
-            }
-            throw new Error('Token refresh failed');
+            return success;
         } catch (error) {
             throw error;
         }
     }
 
-    private async handleTokenRefresh(): Promise<string> {
+    private async handleTokenRefresh(): Promise<void> {
         if (this.isRefreshing) {
             // If already refreshing, wait for it to complete
             return new Promise((resolve, reject) => {
@@ -71,12 +63,14 @@ class HttpClient {
         this.isRefreshing = true;
 
         try {
-            const newToken = await this.refreshToken();
-            this.processQueue(null, newToken);
+            const success = await this.refreshToken();
+            if (!success) {
+                throw new Error('Token refresh failed');
+            }
+            this.processQueue(null);
             this.isRefreshing = false;
-            return newToken!;
         } catch (error) {
-            this.processQueue(error, null);
+            this.processQueue(error);
             this.isRefreshing = false;
 
             // Clear auth state and redirect to login
@@ -111,50 +105,41 @@ class HttpClient {
             ...headers
         };
 
-        // Add authorization header if required
-        if (requiresAuth) {
-            const { getAccessToken } = useAuthStore.getState();
-            const token = getAccessToken();
-
-            if (token) {
-                requestHeaders.Authorization = `Bearer ${token}`;
-            }
-        }
-
-        // Prepare request options
+        // Prepare request options with credentials to include HTTP-only cookies
         const requestOptions: RequestInit = {
             method,
             headers: requestHeaders,
-            body: body ? JSON.stringify(body) : undefined
+            body: body ? JSON.stringify(body) : undefined,
+            credentials: 'include' // Include cookies in requests
         };
 
         try {
             const response = await fetch(url, requestOptions);
 
-            // Handle token expiration
+            // Handle token expiration for authenticated routes
             if (response.status === 401 && requiresAuth) {
                 const data = await response.json();
 
-                if (data.code === 'TOKEN_EXPIRED') {
+                if (data.code === 'TOKEN_EXPIRED' || data.code === 'INVALID_TOKEN') {
                     // Attempt to refresh token
                     try {
-                        const newToken = await this.handleTokenRefresh();
+                        await this.handleTokenRefresh();
 
-                        // Retry the original request with new token
-                        requestHeaders.Authorization = `Bearer ${newToken}`;
-                        const retryResponse = await fetch(url, {
-                            ...requestOptions,
-                            headers: requestHeaders
-                        });
+                        // Retry the original request
+                        const retryResponse = await fetch(url, requestOptions);
 
-                        return await retryResponse.json();
+                        if (retryResponse.ok) {
+                            return await retryResponse.json();
+                        } else {
+                            return await retryResponse.json();
+                        }
                     } catch (refreshError) {
                         // Token refresh failed, return original error
                         return data;
                     }
                 }
 
-                // Other 401 errors (invalid token, etc.)
+                // Other 401 errors (no token, account locked, etc.)
                 return data;
             }
 

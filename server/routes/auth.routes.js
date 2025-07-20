@@ -14,6 +14,7 @@ import {
   authenticateToken,
   validateToken,
 } from "../controllers/auth.controller.js";
+import authorize from "../middlewares/auth.middleware.js";
 
 const authRouter = Router();
 
@@ -34,6 +35,6 @@ authRouter.post("/verify-password-reset-otp", verifyPasswordResetOTP);
 // Token management
 authRouter.post("/refresh-token", refreshToken);
 authRouter.post("/sign-out", signOut);
-authRouter.get("/validate-token", authenticateToken, validateToken);
+authRouter.get("/validate-token", authorize, validateToken);
 
 export default authRouter;

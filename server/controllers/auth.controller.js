@@ -117,6 +117,23 @@ export const verifyRegistrationOTP = async (req, res, next) => {
       }
     );
 
+    // Set tokens as HTTP cookies
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 60 * 60 * 1000, // 1 hour
+      path: "/",
+    });
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: "/",
+    });
+
     res.status(201).json({
       success: true,
       message: "Registration successful",
@@ -264,6 +281,23 @@ export const verifyLoginOTP = async (req, res, next) => {
       }
     );
 
+    // Set tokens as HTTP cookies
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 60 * 60 * 1000, // 1 hour
+      path: "/",
+    });
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: "/",
+    });
+
     res.status(200).json({
       success: true,
       message: "Login successful",
@@ -397,7 +431,10 @@ export const verifyPasswordResetOTP = async (req, res, next) => {
 
 export const refreshToken = async (req, res, next) => {
   try {
-    const {refreshToken} = req.body;
+    // Try to get refresh token from cookie first, then from body
+    const refreshTokenFromCookie = req.cookies.refreshToken;
+    const refreshTokenFromBody = req.body.refreshToken;
+    const refreshToken = refreshTokenFromCookie || refreshTokenFromBody;
 
     if (!refreshToken) {
       const error = new Error("Refresh token is required");
@@ -436,6 +473,23 @@ export const refreshToken = async (req, res, next) => {
       {expiresIn: REFRESH_TOKEN_EXPIRES_IN || "7d"}
     );
 
+    // Set new tokens as HTTP cookies
+    res.cookie("accessToken", newAccessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 60 * 60 * 1000, // 1 hour
+      path: "/",
+    });
+
+    res.cookie("refreshToken", newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: "/",
+    });
+
     res.status(200).json({
       success: true,
       message: "Token refreshed successfully",
@@ -449,7 +503,21 @@ export const refreshToken = async (req, res, next) => {
 
 export const signOut = async (req, res, next) => {
   try {
-    // Nothing to revoke since we don't store refresh tokens
+    // Clear authentication cookies
+    res.clearCookie("accessToken", {
+      path: "/",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+    });
+
+    res.clearCookie("refreshToken", {
+      path: "/",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+    });
+
     res.status(200).json({
       success: true,
       message: "User signed out successfully",
@@ -462,7 +530,7 @@ export const signOut = async (req, res, next) => {
 export const validateToken = async (req, res, next) => {
   try {
     // The user info is already available from the auth middleware
-    const user = await User.findById(req.user.userId).select("-password");
+    const user = req.user; // authorize middleware already fetches full user object
 
     if (!user) {
       const error = new Error("User not found");
@@ -520,7 +588,7 @@ export const authenticateToken = (req, res, next) => {
       success: false,
       valid: false,
       message: "Access token is required",
-      code: "NO_TOKEN"
+      code: "NO_TOKEN",
     });
   }
 
@@ -529,7 +597,7 @@ export const authenticateToken = (req, res, next) => {
       let errorResponse = {
         success: false,
         valid: false,
-        message: "Token verification failed"
+        message: "Token verification failed",
       };
 
       if (err.name === "TokenExpiredError") {
